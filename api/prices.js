@@ -5,16 +5,25 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing required parameters." });
   }
 
-  const url = `https://odegdcpnma.execute-api.eu-west-2.amazonaws.com/development/prices?dno=10&voltage=HV&start=01-06-2021&end=03-06-2021`;
+  const url = `https://odegdcpnma.execute-api.eu-west-2.amazonaws.com/development/prices?dno=${dno}&voltage=${voltage}&start=${start}&end=${end}`;
 
   try {
     const response = await fetch(url);
-    const data = await response.json();
+    const text = await response.text();
 
+    console.log("🔗 Fetch URL:", url);
+    console.log("📦 Status:", response.status);
+    console.log("🧾 Body:", text);
+
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    const data = JSON.parse(text);
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(200).json(data);
   } catch (err) {
-    console.error("API fetch failed:", err);
-    res.status(500).json({ error: "Failed to fetch data from source API." });
+    console.error("❌ API fetch failed:", err.message);
+    res.status(500).json({ error: err.message || "API fetch failed." });
   }
 }
