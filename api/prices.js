@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     const response = await fetch(url);
     const data = await response.json();
 
-    res.setHeader("Access-Control-Allow-Origin", "*"); // 👈 allows HubSpot to fetch it
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(200).json(data);
   } catch (err) {
     console.error("API fetch failed:", err);
