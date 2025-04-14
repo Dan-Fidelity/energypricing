@@ -1,9 +1,8 @@
 {
-    "version": 2,
-    "functions": {
-      "api/*.js": {
-        "runtime": "edge"
-      }
+  "version": 2,
+  "functions": {
+    "api/*.js": {
+      "runtime": "edge"
     }
   }
-  
+}
