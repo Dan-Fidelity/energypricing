@@ -5,7 +5,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing required parameters." });
   }
 
-  const url = `https://odegdcpnma.execute-api.eu-west-2.amazonaws.com/development/prices?dno=${dno}&voltage=${voltage}&start=${start}&end=${end}`;
+  const url = `https://odegdcpnma.execute-api.eu-west-2.amazonaws.com/development/prices?dno=10&voltage=HV&start=01-06-2021&end=03-06-2021`;
 
   try {
     const response = await fetch(url);
