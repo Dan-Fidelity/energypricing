@@ -42,6 +42,8 @@ export default async function handler(req, res) {
 
     const formatted = [sheet]; // Infogram expects data wrapped in an array of sheets
 
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", "application/json");
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate");
     res.status(200).json(formatted);
   } catch (error) {
