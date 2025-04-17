@@ -1,3 +1,5 @@
+// /api/prices.js
+
 export default async function handler(req, res) {
   const { date, period } = req.query;
 
@@ -5,23 +7,39 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing 'date' or 'period' query parameter" });
   }
 
-  const endpoint = `https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices/${date}/${period}?format=json`;
-
   try {
-    const response = await fetch(endpoint);
+    const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices/${date}/${period}?format=json`;
+    const response = await fetch(url);
+
     if (!response.ok) {
-      throw new Error(`Elexon API returned ${response.status}`);
+      return res.status(response.status).json({ error: 'Failed to fetch data from Elexon' });
     }
 
     const data = await response.json();
+    const priceData = data?.data?.[0];
 
-    return res.status(200).json({
+    if (!priceData) {
+      return res.status(404).json({ error: 'No system price data found for this period' });
+    }
+
+    const simplified = {
       date,
-      settlementPeriod: period,
-      systemPrices: data,
-    });
+      period,
+      prices: [
+        {
+          settlementPeriod: priceData.settlementPeriod,
+          buyPrice: priceData.systemBuyPrice,
+          sellPrice: priceData.systemSellPrice,
+          imbalanceVolume: Math.round(priceData.netImbalanceVolume * 100) / 100,
+          startTime: priceData.startTime
+        }
+      ]
+    };
+
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate');
+    res.status(200).json(simplified);
   } catch (error) {
-    console.error("Failed to fetch Elexon system prices:", error);
-    return res.status(500).json({ error: "Failed to fetch data", details: error.message });
+    console.error('Error fetching or processing Elexon data:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 }
