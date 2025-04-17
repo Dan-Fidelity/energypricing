@@ -9,22 +9,22 @@ export default async function handler(req, res) {
 
   try {
     const sheet = [];
-    const header = ["Time", "System Buy Price", "System Sell Price"];
+    const header = ["Time", "Market Index Price"];
     sheet.push(header);
 
     for (let period = 1; period <= 50; period++) {
-      const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices/${date}/${period}?format=json`;
+      const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/pricing/market-index?from=${date}T00:00Z&to=${date}T23:59Z&settlementPeriodFrom=${period}&settlementPeriodTo=${period}`;
       const response = await fetch(url);
 
       if (!response.ok) {
-        console.warn(`Failed to fetch data for period ${period}`);
+        console.warn(`Failed to fetch market index data for period ${period}`);
         continue;
       }
 
       const json = await response.json();
       const priceData = json?.data?.[0];
 
-      if (!priceData) continue;
+      if (!priceData || priceData.marketIndexPrice == null) continue;
 
       const time = new Date(priceData.startTime).toLocaleTimeString("en-GB", {
         hour: "2-digit",
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         timeZone: "Europe/London"
       });
 
-      const row = [time, priceData.systemBuyPrice, priceData.systemSellPrice];
+      const row = [time, priceData.marketIndexPrice];
       sheet.push(row);
     }
 
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate");
     res.status(200).json(formatted);
   } catch (error) {
-    console.error("Error fetching or processing Elexon data:", error);
+    console.error("Error fetching or processing Elexon Market Index data:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
