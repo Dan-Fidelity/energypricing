@@ -7,34 +7,45 @@ export default async function handler(req, res) {
     sheet.push(header);
 
     const today = new Date();
+    const maxDays = 365;
+    const concurrencyLimit = 10; // Limit the number of parallel requests
+    const allDates = [];
 
-    // Fetch data for the last 365 days
-    for (let i = 0; i < 365; i++) {
+    for (let i = 0; i < maxDays; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       const dateString = date.toISOString().split("T")[0];
-
-      const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/pricing/market-index?from=${dateString}T00:00Z&to=${dateString}T23:59Z`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        console.warn(`Failed to fetch market index data for ${dateString}`);
-        continue;
-      }
-
-      const json = await response.json();
-      const validData = json?.data?.filter(entry => entry.price > 0);
-
-      if (!validData || validData.length === 0) continue;
-
-      // Calculate average market index price for the day
-      const averagePrice = validData.reduce((sum, entry) => sum + entry.price, 0) / validData.length;
-
-      const row = [dateString, Math.round(averagePrice * 100) / 100];
-      sheet.push(row);
+      allDates.push(dateString);
     }
 
-    const formatted = [sheet]; // Infogram expects data wrapped in an array of sheets
+    async function fetchBatch(dates) {
+      return Promise.allSettled(
+        dates.map(async (dateString) => {
+          const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/pricing/market-index?from=${dateString}T00:00Z&to=${dateString}T23:59Z`;
+          const res = await fetch(url);
+          const json = await res.json();
+          return { date: dateString, json };
+        })
+      );
+    }
+
+    for (let i = 0; i < allDates.length; i += concurrencyLimit) {
+      const batch = allDates.slice(i, i + concurrencyLimit);
+      const results = await fetchBatch(batch);
+
+      for (const result of results) {
+        if (result.status !== "fulfilled") continue;
+        const { date, json } = result.value;
+
+        const validData = json?.data?.filter(entry => entry.price > 0);
+        if (!validData || validData.length === 0) continue;
+
+        const averagePrice = validData.reduce((sum, entry) => sum + entry.price, 0) / validData.length;
+        sheet.push([date, Math.round(averagePrice * 100) / 100]);
+      }
+    }
+
+    const formatted = [sheet];
 
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Content-Type", "application/json");
