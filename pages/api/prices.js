@@ -1,23 +1,24 @@
 // /api/prices.js
 
 export default async function handler(req, res) {
-  const { date } = req.query;
-
-  if (!date) {
-    return res.status(400).json({ error: "Missing 'date' query parameter" });
-  }
-
   try {
     const sheet = [];
-    const header = ["Time", "Market Index Price"];
+    const header = ["Date", "Market Index Price"];
     sheet.push(header);
 
-    for (let period = 1; period <= 50; period++) {
-      const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/pricing/market-index?from=${date}T00:00Z&to=${date}T23:59Z&settlementPeriodFrom=${period}&settlementPeriodTo=${period}`;
+    const today = new Date();
+
+    // Fetch data for the last 365 days
+    for (let i = 0; i < 365; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateString = date.toISOString().split("T")[0];
+
+      const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/pricing/market-index?from=${dateString}T00:00Z&to=${dateString}T23:59Z`;
       const response = await fetch(url);
 
       if (!response.ok) {
-        console.warn(`Failed to fetch market index data for period ${period}`);
+        console.warn(`Failed to fetch market index data for ${dateString}`);
         continue;
       }
 
@@ -26,17 +27,10 @@ export default async function handler(req, res) {
 
       if (!validData || validData.length === 0) continue;
 
-      // Use the first valid price entry (typically APX)
-      const priceData = validData[0];
+      // Calculate average market index price for the day
+      const averagePrice = validData.reduce((sum, entry) => sum + entry.price, 0) / validData.length;
 
-      const time = new Date(priceData.startTime).toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-        timeZone: "Europe/London"
-      });
-
-      const row = [time, priceData.price];
+      const row = [dateString, Math.round(averagePrice * 100) / 100];
       sheet.push(row);
     }
 
@@ -44,7 +38,7 @@ export default async function handler(req, res) {
 
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Content-Type", "application/json");
-    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate");
+    res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate");
     res.status(200).json(formatted);
   } catch (error) {
     console.error("Error fetching or processing Elexon Market Index data:", error);
