@@ -22,9 +22,12 @@ export default async function handler(req, res) {
       }
 
       const json = await response.json();
-      const priceData = json?.data?.[0];
+      const validData = json?.data?.filter(entry => entry.price > 0);
 
-      if (!priceData || priceData.marketIndexPrice == null) continue;
+      if (!validData || validData.length === 0) continue;
+
+      // Use the first valid price entry (typically APX)
+      const priceData = validData[0];
 
       const time = new Date(priceData.startTime).toLocaleTimeString("en-GB", {
         hour: "2-digit",
@@ -33,7 +36,7 @@ export default async function handler(req, res) {
         timeZone: "Europe/London"
       });
 
-      const row = [time, priceData.marketIndexPrice];
+      const row = [time, priceData.price];
       sheet.push(row);
     }
 
