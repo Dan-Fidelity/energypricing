@@ -45,7 +45,9 @@ export default async function handler(req, res) {
       }
     }
 
-    const formatted = [sheet];
+    // Reverse the data rows (excluding the header) to be from oldest to newest
+    const [headerRow, ...dataRows] = sheet;
+    const formatted = [[headerRow, ...dataRows.reverse()]];
 
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Content-Type", "application/json");
