@@ -1,45 +1,47 @@
 // /api/prices.js
 
 export default async function handler(req, res) {
-  const { date, period } = req.query;
+  const { date } = req.query;
 
-  if (!date || !period) {
-    return res.status(400).json({ error: "Missing 'date' or 'period' query parameter" });
+  if (!date) {
+    return res.status(400).json({ error: "Missing 'date' query parameter" });
   }
 
   try {
-    const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices/${date}/${period}?format=json`;
-    const response = await fetch(url);
+    const results = [["Time", "Buy Price", "Sell Price"]];
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: 'Failed to fetch data from Elexon' });
+    for (let period = 1; period <= 50; period++) {
+      const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices/${date}/${period}?format=json`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch data for period ${period}`);
+        continue;
+      }
+
+      const json = await response.json();
+      const priceData = json?.data?.[0];
+
+      if (!priceData) continue;
+
+      const time = new Date(priceData.startTime).toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Europe/London"
+      });
+
+      results.push([
+        time,
+        priceData.systemBuyPrice,
+        priceData.systemSellPrice
+      ]);
     }
 
-    const data = await response.json();
-    const priceData = data?.data?.[0];
-
-    if (!priceData) {
-      return res.status(404).json({ error: 'No system price data found for this period' });
-    }
-
-    const simplified = {
-      date,
-      period,
-      prices: [
-        {
-          settlementPeriod: priceData.settlementPeriod,
-          buyPrice: priceData.systemBuyPrice,
-          sellPrice: priceData.systemSellPrice,
-          imbalanceVolume: Math.round(priceData.netImbalanceVolume * 100) / 100,
-          startTime: priceData.startTime
-        }
-      ]
-    };
-
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate');
-    res.status(200).json(simplified);
+    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate");
+    res.status(200).json(results);
   } catch (error) {
-    console.error('Error fetching or processing Elexon data:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching or processing Elexon data:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 }
