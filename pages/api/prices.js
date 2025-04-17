@@ -8,7 +8,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const results = [["Time", "Buy Price", "Sell Price"]];
+    const sheet = [];
+    const header = ["Time", "System Buy Price", "System Sell Price"];
+    sheet.push(header);
 
     for (let period = 1; period <= 50; period++) {
       const url = `https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/system-prices/${date}/${period}?format=json`;
@@ -31,15 +33,14 @@ export default async function handler(req, res) {
         timeZone: "Europe/London"
       });
 
-      results.push([
-        time,
-        priceData.systemBuyPrice,
-        priceData.systemSellPrice
-      ]);
+      const row = [time, priceData.systemBuyPrice, priceData.systemSellPrice];
+      sheet.push(row);
     }
 
+    const formatted = [sheet]; // Infogram expects data wrapped in an array of sheets
+
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate");
-    res.status(200).json(results);
+    res.status(200).json(formatted);
   } catch (error) {
     console.error("Error fetching or processing Elexon data:", error);
     res.status(500).json({ error: "Internal Server Error" });
